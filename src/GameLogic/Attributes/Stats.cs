@@ -284,10 +284,8 @@ public class Stats
     /// <summary>
     /// Gets the attack speed attribute definition.
     /// </summary>
-    public static AttributeDefinition AttackSpeed { get; } = new(new Guid("BACC1115-1E8B-4E62-B952-8F8DDB58A949"), "Attack Speed", string.Empty)
-    {
-        MaximumValue = 200,
-    };
+    public static AttributeDefinition AttackSpeed { get; } = new(new Guid("BACC1115-1E8B-4E62-B952-8F8DDB58A949"), "Attack Speed", string.Empty);
+
 
     /// <summary>
     /// Gets the attack speed by weapon attribute definition.
