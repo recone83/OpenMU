@@ -36,11 +36,14 @@ public class PostChatCommandPlugIn : IChatCommandPlugIn
         {
             return;
         }
+
+        string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
         message = $"{player.SelectedCharacter?.Name}: {message}";
         using (StreamWriter writer = new StreamWriter(this.filePath, append: true))
         {
-            await writer.WriteLineAsync(message).ConfigureAwait(true);
+            await writer.WriteLineAsync($"[{timestamp}]{message}").ConfigureAwait(true);
         }
+
         await player.GameContext.SendGlobalChatMessageAsync("[POST]", message, ChatMessageType.Gens).ConfigureAwait(false);
     }
 }
