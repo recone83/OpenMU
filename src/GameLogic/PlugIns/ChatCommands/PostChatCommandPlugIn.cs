@@ -19,7 +19,6 @@ public class PostChatCommandPlugIn : IChatCommandPlugIn
 {
     private const string CommandKey = "/post";
 
-    private string filePath = "global-chat.txt"; 
     /// <inheritdoc />
     public string Key => CommandKey;
 
@@ -37,11 +36,6 @@ public class PostChatCommandPlugIn : IChatCommandPlugIn
             return;
         }
 
-        message = $"{player.SelectedCharacter?.Name}: {message}";
-        using (StreamWriter writer = new StreamWriter(this.filePath, append: true))
-        {
-            await writer.WriteLineAsync(message).ConfigureAwait(true);
-        }
         await player.GameContext.SendGlobalChatMessageAsync("[POST]", message, ChatMessageType.Gens).ConfigureAwait(false);
     }
 }
