@@ -40,8 +40,7 @@ public class PostChatCommandPlugIn : IChatCommandPlugIn
         message = $"{player.SelectedCharacter?.Name}: {message}";
         using (StreamWriter writer = new StreamWriter(this.filePath, append: true))
         {
-            await writer.WriteLineAsync(message);
-            writer.Close();
+            await writer.WriteLineAsync(message).ConfigureAwait(true);
         }
         await player.GameContext.SendGlobalChatMessageAsync("[POST]", message, ChatMessageType.Gens).ConfigureAwait(false);
     }
