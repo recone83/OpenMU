@@ -167,7 +167,7 @@ public static class ItemExtensions
     /// Determines whether this instance is a weapon which increases wizardry damage.
     /// </summary>
     /// <param name="item">The item.</param>
-    /// <param name="staffRise">The staff/stick's wizardry damage rise percentage.</param>
+    /// <param name="staffRise">The staff/sword/stick's wizardry damage rise percentage.</param>
     /// <returns>
     ///   <c>true</c> if this instance is a weapon which increases wizardry damage; otherwise, <c>false</c>.
     /// </returns>
@@ -347,14 +347,15 @@ public static class ItemExtensions
     /// </summary>
     /// <param name="itemAppearance">The item appearance.</param>
     /// <param name="persistenceContext">The persistence context where the object should be added.</param>
+    /// <param name="gameConfiguration">The game configuration.</param>
     /// <returns>A persistent instance of the given <see cref="ItemAppearance"/>.</returns>
-    public static ItemAppearance MakePersistent(this ItemAppearance itemAppearance, IContext persistenceContext)
+    public static ItemAppearance MakePersistent(this ItemAppearance itemAppearance, IContext persistenceContext, GameConfiguration gameConfiguration)
     {
         var persistent = persistenceContext.CreateNew<ItemAppearance>();
         persistent.ItemSlot = itemAppearance.ItemSlot;
         persistent.Definition = itemAppearance.Definition;
         persistent.Level = itemAppearance.Level;
-        itemAppearance.VisibleOptions.Distinct().ForEach(o => persistent.VisibleOptions.Add(o));
+        itemAppearance.VisibleOptions.Distinct().ForEach(o => persistent.VisibleOptions.Add(gameConfiguration.ItemOptionTypes.First(iot => iot.Equals(o))));
         return persistent;
     }
 

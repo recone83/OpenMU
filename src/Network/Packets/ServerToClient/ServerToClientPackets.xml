@@ -3366,6 +3366,43 @@
     </Packet>
     <Packet>
       <HeaderType>C1HeaderWithSubCode</HeaderType>
+      <Code>F3</Code>
+      <SubCode>32</SubCode>
+      <Name>BaseStatsExtended</Name>
+      <Length>24</Length>
+      <Direction>ServerToClient</Direction>
+      <SentWhen>Setting the base stats of a character, e.g. set stats command or after a reset.</SentWhen>
+      <CausedReaction>The values are updated on the game client user interface.</CausedReaction>
+      <Fields>
+        <Field>
+          <Index>4</Index>
+          <Type>IntegerLittleEndian</Type>
+          <Name>Strength</Name>
+        </Field>
+        <Field>
+          <Index>8</Index>
+          <Type>IntegerLittleEndian</Type>
+          <Name>Agility</Name>
+        </Field>
+        <Field>
+          <Index>12</Index>
+          <Type>IntegerLittleEndian</Type>
+          <Name>Vitality</Name>
+        </Field>
+        <Field>
+          <Index>16</Index>
+          <Type>IntegerLittleEndian</Type>
+          <Name>Energy</Name>
+        </Field>
+        <Field>
+          <Index>20</Index>
+          <Type>IntegerLittleEndian</Type>
+          <Name>Command</Name>
+        </Field>
+      </Fields>
+    </Packet>
+    <Packet>
+      <HeaderType>C1HeaderWithSubCode</HeaderType>
       <Code>27</Code>
       <SubCode>FF</SubCode>
       <Name>CurrentManaAndAbility</Name>
@@ -5403,6 +5440,130 @@
         </Field>
         <Field>
           <Index>18</Index>
+          <Type>IntegerLittleEndian</Type>
+          <Name>Money</Name>
+        </Field>
+      </Fields>
+    </Packet>
+    <Packet>
+      <HeaderType>C1HeaderWithSubCode</HeaderType>
+      <Code>F3</Code>
+      <SubCode>04</SubCode>
+      <Name>RespawnAfterDeath</Name>
+      <Length>28</Length>
+      <Direction>ServerToClient</Direction>
+      <SentWhen>The character respawned after death.</SentWhen>
+      <CausedReaction>The character respawns with the specified attributes at the specified map.</CausedReaction>
+      <Fields>
+        <Field>
+          <Index>4</Index>
+          <Type>Byte</Type>
+          <Name>PositionX</Name>
+        </Field>
+        <Field>
+          <Index>5</Index>
+          <Type>Byte</Type>
+          <Name>PositionY</Name>
+        </Field>
+        <Field>
+          <Index>6</Index>
+          <Type>Byte</Type>
+          <Name>MapNumber</Name>
+        </Field>
+        <Field>
+          <Index>7</Index>
+          <Type>Byte</Type>
+          <Name>Direction</Name>
+        </Field>
+        <Field>
+          <Index>8</Index>
+          <Type>ShortLittleEndian</Type>
+          <Name>CurrentHealth</Name>
+        </Field>
+        <Field>
+          <Index>10</Index>
+          <Type>ShortLittleEndian</Type>
+          <Name>CurrentMana</Name>
+        </Field>
+        <Field>
+          <Index>12</Index>
+          <Type>ShortLittleEndian</Type>
+          <Name>CurrentShield</Name>
+        </Field>
+        <Field>
+          <Index>14</Index>
+          <Type>ShortLittleEndian</Type>
+          <Name>CurrentAbility</Name>
+        </Field>
+        <Field>
+          <Index>16</Index>
+          <Type>LongBigEndian</Type>
+          <Name>Experience</Name>
+        </Field>
+        <Field>
+          <Index>24</Index>
+          <Type>IntegerLittleEndian</Type>
+          <Name>Money</Name>
+        </Field>
+      </Fields>
+    </Packet>
+    <Packet>
+      <HeaderType>C1HeaderWithSubCode</HeaderType>
+      <Code>F3</Code>
+      <SubCode>04</SubCode>
+      <Name>RespawnAfterDeathExtended</Name>
+      <Length>36</Length>
+      <Direction>ServerToClient</Direction>
+      <SentWhen>The character respawned after death.</SentWhen>
+      <CausedReaction>The character respawns with the specified attributes at the specified map.</CausedReaction>
+      <Fields>
+        <Field>
+          <Index>4</Index>
+          <Type>Byte</Type>
+          <Name>PositionX</Name>
+        </Field>
+        <Field>
+          <Index>5</Index>
+          <Type>Byte</Type>
+          <Name>PositionY</Name>
+        </Field>
+        <Field>
+          <Index>6</Index>
+          <Type>Byte</Type>
+          <Name>MapNumber</Name>
+        </Field>
+        <Field>
+          <Index>7</Index>
+          <Type>Byte</Type>
+          <Name>Direction</Name>
+        </Field>
+        <Field>
+          <Index>8</Index>
+          <Type>IntegerLittleEndian</Type>
+          <Name>CurrentHealth</Name>
+        </Field>
+        <Field>
+          <Index>12</Index>
+          <Type>IntegerLittleEndian</Type>
+          <Name>CurrentMana</Name>
+        </Field>
+        <Field>
+          <Index>16</Index>
+          <Type>IntegerLittleEndian</Type>
+          <Name>CurrentShield</Name>
+        </Field>
+        <Field>
+          <Index>20</Index>
+          <Type>IntegerLittleEndian</Type>
+          <Name>CurrentAbility</Name>
+        </Field>
+        <Field>
+          <Index>24</Index>
+          <Type>LongLittleEndian</Type>
+          <Name>Experience</Name>
+        </Field>
+        <Field>
+          <Index>32</Index>
           <Type>IntegerLittleEndian</Type>
           <Name>Money</Name>
         </Field>
@@ -9591,6 +9752,42 @@
         </Field>
         <Field>
           <Index>28</Index>
+          <Type>String</Type>
+          <Name>Message</Name>
+        </Field>
+      </Fields>
+    </Packet>
+    <Packet>
+      <HeaderType>C4Header</HeaderType>
+      <Code>C7</Code>
+      <Name>OpenLetterExtended</Name>
+      <Direction>ServerToClient</Direction>
+      <SentWhen>After the player requested to read a letter.</SentWhen>
+      <CausedReaction>The letter is opened in a new dialog.</CausedReaction>
+      <Fields>
+        <Field>
+          <Index>4</Index>
+          <Type>ShortLittleEndian</Type>
+          <Name>LetterIndex</Name>
+        </Field>
+        <Field>
+          <Index>6</Index>
+          <Type>Binary</Type>
+          <Name>SenderAppearance</Name>
+          <Length>42</Length>
+        </Field>
+        <Field>
+          <Index>48</Index>
+          <Type>Byte</Type>
+          <Name>Rotation</Name>
+        </Field>
+        <Field>
+          <Index>49</Index>
+          <Type>Byte</Type>
+          <Name>Animation</Name>
+        </Field>
+        <Field>
+          <Index>50</Index>
           <Type>String</Type>
           <Name>Message</Name>
         </Field>

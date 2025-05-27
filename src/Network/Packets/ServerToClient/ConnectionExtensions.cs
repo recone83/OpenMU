@@ -1932,6 +1932,42 @@ public static class ConnectionExtensions
     }
 
     /// <summary>
+    /// Sends a <see cref="BaseStatsExtended" /> to this connection.
+    /// </summary>
+    /// <param name="connection">The connection.</param>
+    /// <param name="strength">The strength.</param>
+    /// <param name="agility">The agility.</param>
+    /// <param name="vitality">The vitality.</param>
+    /// <param name="energy">The energy.</param>
+    /// <param name="command">The command.</param>
+    /// <remarks>
+    /// Is sent by the server when: Setting the base stats of a character, e.g. set stats command or after a reset.
+    /// Causes reaction on client side: The values are updated on the game client user interface.
+    /// </remarks>
+    public static async ValueTask SendBaseStatsExtendedAsync(this IConnection? connection, uint @strength, uint @agility, uint @vitality, uint @energy, uint @command)
+    {
+        if (connection is null)
+        {
+            return;
+        }
+
+        int WritePacket()
+        {
+            var length = BaseStatsExtendedRef.Length;
+            var packet = new BaseStatsExtendedRef(connection.Output.GetSpan(length)[..length]);
+            packet.Strength = @strength;
+            packet.Agility = @agility;
+            packet.Vitality = @vitality;
+            packet.Energy = @energy;
+            packet.Command = @command;
+
+            return packet.Header.Length;
+        }
+
+        await connection.SendAsync(WritePacket).ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// Sends a <see cref="CurrentManaAndAbility" /> to this connection.
     /// </summary>
     /// <param name="connection">The connection.</param>
@@ -2649,6 +2685,98 @@ public static class ConnectionExtensions
             packet.Direction = @direction;
             packet.CurrentHealth = @currentHealth;
             packet.CurrentMana = @currentMana;
+            packet.CurrentAbility = @currentAbility;
+            packet.Experience = @experience;
+            packet.Money = @money;
+
+            return packet.Header.Length;
+        }
+
+        await connection.SendAsync(WritePacket).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Sends a <see cref="RespawnAfterDeath" /> to this connection.
+    /// </summary>
+    /// <param name="connection">The connection.</param>
+    /// <param name="positionX">The position x.</param>
+    /// <param name="positionY">The position y.</param>
+    /// <param name="mapNumber">The map number.</param>
+    /// <param name="direction">The direction.</param>
+    /// <param name="currentHealth">The current health.</param>
+    /// <param name="currentMana">The current mana.</param>
+    /// <param name="currentShield">The current shield.</param>
+    /// <param name="currentAbility">The current ability.</param>
+    /// <param name="experience">The experience.</param>
+    /// <param name="money">The money.</param>
+    /// <remarks>
+    /// Is sent by the server when: The character respawned after death.
+    /// Causes reaction on client side: The character respawns with the specified attributes at the specified map.
+    /// </remarks>
+    public static async ValueTask SendRespawnAfterDeathAsync(this IConnection? connection, byte @positionX, byte @positionY, byte @mapNumber, byte @direction, ushort @currentHealth, ushort @currentMana, ushort @currentShield, ushort @currentAbility, ulong @experience, uint @money)
+    {
+        if (connection is null)
+        {
+            return;
+        }
+
+        int WritePacket()
+        {
+            var length = RespawnAfterDeathRef.Length;
+            var packet = new RespawnAfterDeathRef(connection.Output.GetSpan(length)[..length]);
+            packet.PositionX = @positionX;
+            packet.PositionY = @positionY;
+            packet.MapNumber = @mapNumber;
+            packet.Direction = @direction;
+            packet.CurrentHealth = @currentHealth;
+            packet.CurrentMana = @currentMana;
+            packet.CurrentShield = @currentShield;
+            packet.CurrentAbility = @currentAbility;
+            packet.Experience = @experience;
+            packet.Money = @money;
+
+            return packet.Header.Length;
+        }
+
+        await connection.SendAsync(WritePacket).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Sends a <see cref="RespawnAfterDeathExtended" /> to this connection.
+    /// </summary>
+    /// <param name="connection">The connection.</param>
+    /// <param name="positionX">The position x.</param>
+    /// <param name="positionY">The position y.</param>
+    /// <param name="mapNumber">The map number.</param>
+    /// <param name="direction">The direction.</param>
+    /// <param name="currentHealth">The current health.</param>
+    /// <param name="currentMana">The current mana.</param>
+    /// <param name="currentShield">The current shield.</param>
+    /// <param name="currentAbility">The current ability.</param>
+    /// <param name="experience">The experience.</param>
+    /// <param name="money">The money.</param>
+    /// <remarks>
+    /// Is sent by the server when: The character respawned after death.
+    /// Causes reaction on client side: The character respawns with the specified attributes at the specified map.
+    /// </remarks>
+    public static async ValueTask SendRespawnAfterDeathExtendedAsync(this IConnection? connection, byte @positionX, byte @positionY, byte @mapNumber, byte @direction, uint @currentHealth, uint @currentMana, uint @currentShield, uint @currentAbility, ulong @experience, uint @money)
+    {
+        if (connection is null)
+        {
+            return;
+        }
+
+        int WritePacket()
+        {
+            var length = RespawnAfterDeathExtendedRef.Length;
+            var packet = new RespawnAfterDeathExtendedRef(connection.Output.GetSpan(length)[..length]);
+            packet.PositionX = @positionX;
+            packet.PositionY = @positionY;
+            packet.MapNumber = @mapNumber;
+            packet.Direction = @direction;
+            packet.CurrentHealth = @currentHealth;
+            packet.CurrentMana = @currentMana;
+            packet.CurrentShield = @currentShield;
             packet.CurrentAbility = @currentAbility;
             packet.Experience = @experience;
             packet.Money = @money;
@@ -5535,6 +5663,42 @@ public static class ConnectionExtensions
             var packet = new OpenLetterRef(connection.Output.GetSpan(length)[..length]);
             packet.LetterIndex = @letterIndex;
             packet.MessageSize = @messageSize;
+            @senderAppearance.Span.CopyTo(packet.SenderAppearance);
+            packet.Rotation = @rotation;
+            packet.Animation = @animation;
+            packet.Message = @message;
+
+            return packet.Header.Length;
+        }
+
+        await connection.SendAsync(WritePacket).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Sends a <see cref="OpenLetterExtended" /> to this connection.
+    /// </summary>
+    /// <param name="connection">The connection.</param>
+    /// <param name="letterIndex">The letter index.</param>
+    /// <param name="senderAppearance">The sender appearance.</param>
+    /// <param name="rotation">The rotation.</param>
+    /// <param name="animation">The animation.</param>
+    /// <param name="message">The message.</param>
+    /// <remarks>
+    /// Is sent by the server when: After the player requested to read a letter.
+    /// Causes reaction on client side: The letter is opened in a new dialog.
+    /// </remarks>
+    public static async ValueTask SendOpenLetterExtendedAsync(this IConnection? connection, ushort @letterIndex, Memory<byte> @senderAppearance, byte @rotation, byte @animation, string @message)
+    {
+        if (connection is null)
+        {
+            return;
+        }
+
+        int WritePacket()
+        {
+            var length = OpenLetterExtendedRef.GetRequiredSize(message);
+            var packet = new OpenLetterExtendedRef(connection.Output.GetSpan(length)[..length]);
+            packet.LetterIndex = @letterIndex;
             @senderAppearance.Span.CopyTo(packet.SenderAppearance);
             packet.Rotation = @rotation;
             packet.Animation = @animation;

@@ -23,6 +23,7 @@ using MUnique.OpenMU.GameLogic.Views.Character;
 using MUnique.OpenMU.GameLogic.Views.Inventory;
 using MUnique.OpenMU.GameLogic.Views.MuHelper;
 using MUnique.OpenMU.GameLogic.Views.Pet;
+using MUnique.OpenMU.GameLogic.Views.PlayerShop;
 using MUnique.OpenMU.GameLogic.Views.Quest;
 using MUnique.OpenMU.GameLogic.Views.World;
 using MUnique.OpenMU.Interfaces;
@@ -142,6 +143,9 @@ public class Player : AsyncDisposable, IBucketMapObserver, IAttackable, IAttacke
     /// Gets a value indicating whether this instance is invisible to other players.
     /// </summary>
     public bool IsInvisible => this.Attributes?[Stats.IsInvisible] > 0;
+
+    /// <inheritdoc />
+    public bool IsTemplatePlayer => this.Account?.IsTemplate is true;
 
     /// <summary>
     /// Gets the skill hit validator.
@@ -476,6 +480,11 @@ public class Player : AsyncDisposable, IBucketMapObserver, IAttackable, IAttacke
     /// </summary>
     public DateTime PotionCooldownUntil { get; set; } = DateTime.UtcNow;
 
+    /// <summary>
+    /// Gets a value indicating whether opening the player store after entering the game is supported by this instance.
+    /// </summary>
+    protected virtual bool IsPlayerStoreOpeningAfterEnterSupported => true;
+
     private static readonly MagicEffectDefinition GMEffect = new GMMagicEffectDefinition
     {
         InformObservers = true,
@@ -509,7 +518,7 @@ public class Player : AsyncDisposable, IBucketMapObserver, IAttackable, IAttacke
             this._appearanceData.RaiseAppearanceChanged();
 
             await this.PlayerLeftWorld.SafeInvokeAsync(this).ConfigureAwait(false);
-            
+
             (this.SkillList as IDisposable)?.Dispose();
             this.SkillList = null;
 
@@ -627,9 +636,10 @@ public class Player : AsyncDisposable, IBucketMapObserver, IAttackable, IAttacke
             this.Attributes[Stats.CurrentHealth] = this.Attributes[Stats.MaximumHealth];
         }
 
-        if (Rand.NextRandomBool(this.Attributes[Stats.FullyRecoverManaAfterHitChance]))
+        var manaFullyRecovered = Rand.NextRandomBool(this.Attributes[Stats.FullyRecoverManaAfterHitChance]);
+        if (hitInfo.ManaToll > 0 || manaFullyRecovered)
         {
-            this.Attributes[Stats.CurrentMana] = this.Attributes[Stats.MaximumMana];
+            this.Attributes[Stats.CurrentMana] = (manaFullyRecovered ? this.Attributes[Stats.MaximumMana] : this.Attributes[Stats.CurrentMana]) - hitInfo.ManaToll;
         }
 
         await this.HitAsync(hitInfo, attacker, skill?.Skill).ConfigureAwait(false);
@@ -1059,8 +1069,7 @@ public class Player : AsyncDisposable, IBucketMapObserver, IAttackable, IAttacke
                             && (short)this.Attributes![Stats.Level] == this.GameContext.Configuration.MaximumLevel;
         var expRateAttribute = addMasterExperience ? Stats.MasterExperienceRate : Stats.ExperienceRate;
 
-        var totalLevel = this.Attributes![Stats.Level] + this.Attributes![Stats.MasterLevel];
-        var experience = killedObject.CalculateBaseExperience(totalLevel);
+        var experience = killedObject.CalculateBaseExperience(this.Attributes![Stats.TotalLevel]);
         experience *= this.GameContext.ExperienceRate;
         experience *= this.Attributes[expRateAttribute];
         experience *= this.CurrentMap?.Definition.ExpMultiplier ?? 1;
@@ -1211,8 +1220,28 @@ public class Player : AsyncDisposable, IBucketMapObserver, IAttackable, IAttacke
             return;
         }
 
+        if (steps.IsEmpty)
+        {
+            return;
+        }
+
         await this._walker.StopAsync().ConfigureAwait(false);
-        if (currentMap.Terrain.WalkMap[target.X, target.Y])
+
+        var startPoint = steps.Span[0].From;
+        var currentPosition = this.Position;
+        var startOffset = startPoint.EuclideanDistanceTo(currentPosition);
+        const int maxAllowedWalkStartOffset = 3;
+        if (startOffset > maxAllowedWalkStartOffset)
+        {
+            this.Logger.LogWarning("WalkToAsync: Player requested to walk from {0}, but it's currently at {1}", startPoint, currentPosition);
+
+            // Send current position back to the client, so that it can re-synchronize.
+            await this.InvokeViewPlugInAsync<IObjectMovedPlugIn>(p => p.ObjectMovedAsync(this, MoveType.Instant)).ConfigureAwait(false);
+            return;
+        }
+
+        var canWalkToTarget = currentMap.Terrain.WalkMap[target.X, target.Y];
+        if (canWalkToTarget)
         {
             this.Logger.LogDebug("WalkToAsync: Player is walking to {0}", target);
 
@@ -1404,12 +1433,14 @@ public class Player : AsyncDisposable, IBucketMapObserver, IAttackable, IAttacke
 
         int i = 0;
         var result = new (AttributeDefinition Target, IElement BuffPowerUp)[skill.MagicEffectDef.PowerUpDefinitions.Count];
+        var durationElement = this.Attributes!.CreateDurationElement(skill.MagicEffectDef.Duration);
         AddSkillPowersToResult(skill);
-        skillEntry.PowerUpDuration = this.Attributes!.CreateDurationElement(skill.MagicEffectDef.Duration);
+        skillEntry.PowerUpDuration = durationElement;
         skillEntry.PowerUps = result;
 
         void AddSkillPowersToResult(Skill skill)
         {
+            var durationExtended = false;
             foreach (var powerUpDef in skill.MagicEffectDef!.PowerUpDefinitions)
             {
                 IElement powerUp;
@@ -1417,11 +1448,26 @@ public class Player : AsyncDisposable, IBucketMapObserver, IAttackable, IAttacke
                 {
                     powerUp = this.Attributes!.CreateElement(powerUpDef);
 
-                    foreach (var masterSkillDefinition in GetMasterSkillDefinitions(skill.MasterDefinition))
+                    foreach (var masterSkillEntry in GetMasterSkillEntries(skillEntry))
                     {
-                        // Apply either for all, or just for the specified TargetAttribute of the master skill
-                        powerUp = AppedMasterSkillPowerUp(masterSkillDefinition, powerUpDef, powerUp);
+                        var extendsDuration = masterSkillEntry.Skill?.MasterDefinition?.ExtendsDuration ?? false;
+                        if (extendsDuration && !durationExtended)
+                        {
+                            durationElement = new CombinedElement(durationElement, new ConstantElement(skillEntry.CalculateValue()));
+                        }
+                        else if (extendsDuration)
+                        {
+                            continue;
+                        }
+                        else
+                        {
+                            // Apply either for all, or just for the specified TargetAttribute of the master skill
+                            powerUp = AppedMasterSkillPowerUp(masterSkillEntry, powerUpDef, powerUp);
+                        }
                     }
+
+                    // After the first iteration all possible duration extensions have been applied
+                    durationExtended = true;
                 }
                 else
                 {
@@ -1433,27 +1479,34 @@ public class Player : AsyncDisposable, IBucketMapObserver, IAttackable, IAttacke
             }
         }
 
-        IEnumerable<MasterSkillDefinition> GetMasterSkillDefinitions(MasterSkillDefinition? masterSkillDefinition)
+        IEnumerable<SkillEntry> GetMasterSkillEntries(SkillEntry? masterSkillEntry)
         {
-            var current = masterSkillDefinition;
-            while (current is not null)
+            var currentEntry = masterSkillEntry;
+            while (currentEntry is not null)
             {
-                yield return current;
-                current = current.ReplacedSkill?.MasterDefinition;
+                yield return currentEntry;
+                if (currentEntry.Skill?.MasterDefinition?.ReplacedSkill is { } replacedSkill && replacedSkill.MasterDefinition is not null)
+                {
+                    currentEntry = this.SkillList!.GetSkill((ushort)replacedSkill.Number);
+                }
+                else
+                {
+                    currentEntry = null;
+                }
             }
         }
 
-        IElement AppedMasterSkillPowerUp(MasterSkillDefinition? masterSkillDefinition, PowerUpDefinition powerUpDef, IElement powerUp)
+        IElement AppedMasterSkillPowerUp(SkillEntry? masterSkillEntry, PowerUpDefinition powerUpDef, IElement powerUp)
         {
-            if (masterSkillDefinition is null)
+            if (masterSkillEntry?.Skill?.MasterDefinition is not { } masterSkillDefinition)
             {
                 return powerUp;
             }
 
-            if (masterSkillDefinition?.TargetAttribute is not { } masterSkillTargetAttribute
+            if (masterSkillDefinition.TargetAttribute is not { } masterSkillTargetAttribute
                 || masterSkillTargetAttribute == powerUpDef.TargetAttribute)
             {
-                var additionalValue = new SimpleElement(skillEntry.CalculateValue(), skillEntry.Skill.MasterDefinition?.Aggregation ?? powerUp.AggregateType);
+                var additionalValue = new SimpleElement(masterSkillEntry.CalculateValue(), masterSkillEntry.Skill.MasterDefinition?.Aggregation ?? powerUp.AggregateType);
                 powerUp = new CombinedElement(powerUp, additionalValue);
             }
 
@@ -1651,12 +1704,27 @@ public class Player : AsyncDisposable, IBucketMapObserver, IAttackable, IAttacke
 
         try
         {
-            await this.PersistenceContext.SaveChangesAsync().ConfigureAwait(false);
+            await this.SaveProgressAsync().ConfigureAwait(false);
         }
         catch (Exception ex)
         {
             this.Logger.LogError(ex, "Couldn't save when leaving the game. Player: {player}", this);
         }
+    }
+
+    /// <summary>
+    /// Saves the progress of the player.
+    /// </summary>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>Success of the save operation.</returns>
+    public async ValueTask<bool> SaveProgressAsync(CancellationToken cancellationToken = default)
+    {
+        if (!this.IsTemplatePlayer)
+        {
+            return await this.PersistenceContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        return true;
     }
 
     /// <inheritdoc />
@@ -2088,33 +2156,33 @@ public class Player : AsyncDisposable, IBucketMapObserver, IAttackable, IAttacke
 
     private async ValueTask OnPlayerEnteredWorldAsync()
     {
-        if (this.SelectedCharacter is null)
+        if (this.SelectedCharacter is not { } selectedCharacter)
         {
             throw new InvalidOperationException($"The player has no selected character.");
         }
 
-        if (this.SelectedCharacter?.CharacterClass is null)
+        if (selectedCharacter.CharacterClass is null)
         {
-            throw new InvalidOperationException($"The character '{this.SelectedCharacter}' has no assigned character class.");
+            throw new InvalidOperationException($"The character '{selectedCharacter}' has no assigned character class.");
         }
 
         // For characters which got created on the database or with the admin panel,
         // it's possible that they're missing the inventory. In this case, we create it here
         // and initialize with default items.
-        if (this.SelectedCharacter!.Inventory is null)
+        if (selectedCharacter!.Inventory is null)
         {
-            this.SelectedCharacter.Inventory = this.PersistenceContext.CreateNew<ItemStorage>();
-            this.GameContext.PlugInManager.GetPlugInPoint<ICharacterCreatedPlugIn>()?.CharacterCreated(this, this.SelectedCharacter);
+            selectedCharacter.Inventory = this.PersistenceContext.CreateNew<ItemStorage>();
+            this.GameContext.PlugInManager.GetPlugInPoint<ICharacterCreatedPlugIn>()?.CharacterCreated(this, selectedCharacter);
         }
 
-        this.SelectedCharacter.CurrentMap ??= this.SelectedCharacter.CharacterClass?.HomeMap;
+        selectedCharacter.CurrentMap ??= selectedCharacter.CharacterClass?.HomeMap;
         this.AddMissingStatAttributes();
 
-        this.Attributes = new ItemAwareAttributeSystem(this.Account!, this.SelectedCharacter!);
+        this.Attributes = new ItemAwareAttributeSystem(this.Account!, selectedCharacter);
         this.LogInvalidInventoryItems();
 
         this.Inventory = new InventoryStorage(this, this.GameContext);
-        this.ShopStorage = new ShopStorage(this);
+        this.ShopStorage = new ShopStorage(selectedCharacter);
         this.TemporaryStorage = new Storage(InventoryConstants.TemporaryStorageSize, new TemporaryItemStorage());
         this.Vault = null; // vault storage is getting set when vault npc is opened.
         this.SkillList = new SkillList(this);
@@ -2143,17 +2211,31 @@ public class Player : AsyncDisposable, IBucketMapObserver, IAttackable, IAttacke
         await this.InvokeViewPlugInAsync<IUpdateRotationPlugIn>(p => p.UpdateRotationAsync()).ConfigureAwait(false);
         await this.ResetPetBehaviorAsync().ConfigureAwait(false);
 
-        if (this.SelectedCharacter?.MuHelperConfiguration is { } muHelperConfiguration)
+        if (selectedCharacter.MuHelperConfiguration is { } muHelperConfiguration)
         {
             await this.InvokeViewPlugInAsync<IMuHelperConfigurationUpdatePlugIn>(p => p.UpdateMuHelperConfigurationAsync(muHelperConfiguration)).ConfigureAwait(false);
         }
 
         // Add GM mark (mu logo above character's head)
-        if (this.SelectedCharacter?.CharacterStatus == CharacterStatus.GameMaster)
+        if (selectedCharacter.CharacterStatus == CharacterStatus.GameMaster)
         {
             await this.MagicEffectList.AddEffectAsync(new MagicEffect(
             TimeSpan.FromMilliseconds((double)int.MaxValue),
             GMEffect)).ConfigureAwait(false);
+        }
+
+        // Restore previously opened Store
+        if (selectedCharacter.IsStoreOpened
+            && !string.IsNullOrWhiteSpace(selectedCharacter.StoreName)
+            && this.IsPlayerStoreOpeningAfterEnterSupported)
+        {
+            await this.InvokeViewPlugInAsync<IShowShopItemListPlugIn>(p => p.ShowShopItemListAsync(this, true)).ConfigureAwait(false);
+            var action = new PlayerActions.PlayerStore.OpenStoreAction();
+            await action.OpenStoreAsync(this, selectedCharacter.StoreName).ConfigureAwait(false);
+        }
+        else
+        {
+            selectedCharacter.IsStoreOpened = false;
         }
     }
 
@@ -2354,6 +2436,11 @@ public class Player : AsyncDisposable, IBucketMapObserver, IAttackable, IAttacke
                    && (!pet.IsDarkRaven() || pet.GetDarkRavenLeadershipRequirement(pet.Level + 1) <= this.Attributes![Stats.TotalLeadership]))
             {
                 pet.Level++;
+                this.Attributes!.ItemPowerUps[pet] = this.Attributes.ItemPowerUps[pet]
+                    .Append(new PowerUpWrapper(
+                        new SimpleElement(1, AggregateType.AddRaw),
+                        pet.IsDarkRaven() ? Stats.RavenLevel : Stats.HorseLevel,
+                        this.Attributes)).ToList();
 
                 await this.InvokeViewPlugInAsync<IPetInfoViewPlugIn>(p => p.ShowPetInfoAsync(pet, pet.ItemSlot, PetStorageLocation.InventoryPetSlot)).ConfigureAwait(false);
             }

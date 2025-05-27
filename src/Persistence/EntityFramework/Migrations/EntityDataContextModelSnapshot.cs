@@ -35,6 +35,9 @@ namespace MUnique.OpenMU.Persistence.EntityFramework.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<bool>("IsTemplate")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("IsVaultExtended")
                         .HasColumnType("boolean");
 
@@ -196,6 +199,9 @@ namespace MUnique.OpenMU.Persistence.EntityFramework.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<int>("AggregateType")
+                        .HasColumnType("integer");
+
                     b.Property<Guid?>("CharacterClassId")
                         .HasColumnType("uuid");
 
@@ -348,6 +354,9 @@ namespace MUnique.OpenMU.Persistence.EntityFramework.Migrations
                     b.Property<Guid?>("InventoryId")
                         .HasColumnType("uuid");
 
+                    b.Property<bool>("IsStoreOpened")
+                        .HasColumnType("boolean");
+
                     b.Property<byte[]>("KeyConfiguration")
                         .HasColumnType("bytea");
 
@@ -385,6 +394,9 @@ namespace MUnique.OpenMU.Persistence.EntityFramework.Migrations
 
                     b.Property<int>("StateRemainingSeconds")
                         .HasColumnType("integer");
+
+                    b.Property<string>("StoreName")
+                        .HasColumnType("text");
 
                     b.Property<int>("UsedFruitPoints")
                         .HasColumnType("integer");
@@ -2238,6 +2250,9 @@ namespace MUnique.OpenMU.Persistence.EntityFramework.Migrations
                     b.Property<string>("DisplayValueFormula")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<bool>("ExtendsDuration")
+                        .HasColumnType("boolean");
 
                     b.Property<byte>("MaximumLevel")
                         .HasColumnType("smallint");
